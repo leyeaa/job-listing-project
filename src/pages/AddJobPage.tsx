@@ -1,9 +1,12 @@
-import { ReactNode, useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import type { JobFormInput } from "../types/job";
+
 interface Props {
-  addJobSubmit: (newJob: ReactNode) => void;
+  addJobSubmit: (newJob: JobFormInput) => Promise<void>;
 }
+
 const AddJobPage = ({ addJobSubmit }: Props) => {
   const [type, setType] = useState("Full-Time");
   const [title, setTitle] = useState("");
@@ -14,15 +17,13 @@ const AddJobPage = ({ addJobSubmit }: Props) => {
   const [companyDescription, setCompanyDescription] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
-  //   const fields = ["type1", "salary1"];
 
-  //   fields.map((field) => {
-  //     // console.log(field);
-  //   });
-  const submitForm = (e) => {
+  const submitForm = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const newJob = {
+
+    const newJob: JobFormInput = {
       title,
       type,
       description,
@@ -35,16 +36,30 @@ const AddJobPage = ({ addJobSubmit }: Props) => {
         contactPhone,
       },
     };
-    addJobSubmit(newJob);
-    toast.success("Job Added Successfully");
-    return navigate("/jobs");
+
+    setSubmitting(true);
+
+    try {
+      await addJobSubmit(newJob);
+      toast.success("Job posted successfully.");
+      navigate("/jobs");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not post job.";
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
   };
+
   return (
     <section className="bg-indigo-50">
       <div className="container m-auto max-w-2xl py-24">
         <div className="bg-white px-6 py-8 mb-4 shadow-md rounded-md border m-4 md:m-0">
           <form onSubmit={submitForm}>
-            <h2 className="text-3xl text-center font-semibold mb-6">Add Job</h2>
+            <h2 className="text-3xl text-center font-semibold mb-6">
+              Post a Tech Job
+            </h2>
 
             <div className="mb-4">
               <label
@@ -63,6 +78,7 @@ const AddJobPage = ({ addJobSubmit }: Props) => {
               >
                 <option value="Full-Time">Full-Time</option>
                 <option value="Part-Time">Part-Time</option>
+                <option value="Contract">Contract</option>
                 <option value="Remote">Remote</option>
                 <option value="Internship">Internship</option>
               </select>
@@ -77,7 +93,7 @@ const AddJobPage = ({ addJobSubmit }: Props) => {
                 id="title"
                 name="title"
                 className="border rounded w-full py-2 px-3 mb-2"
-                placeholder="eg. Beautiful Apartment In Miami"
+                placeholder="e.g. Senior Platform Engineer"
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -94,7 +110,7 @@ const AddJobPage = ({ addJobSubmit }: Props) => {
                 id="description"
                 name="description"
                 className="border rounded w-full py-2 px-3"
-                rows="4"
+                rows={4}
                 placeholder="Add any job duties, expectations, requirements, etc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -177,7 +193,7 @@ const AddJobPage = ({ addJobSubmit }: Props) => {
                 id="company_description"
                 name="company_description"
                 className="border rounded w-full py-2 px-3"
-                rows="4"
+                rows={4}
                 placeholder="What does your company do?"
                 value={companyDescription}
                 onChange={(e) => setCompanyDescription(e.target.value)}
@@ -224,8 +240,9 @@ const AddJobPage = ({ addJobSubmit }: Props) => {
               <button
                 className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-full w-full focus:outline-none focus:shadow-outline"
                 type="submit"
+                disabled={submitting}
               >
-                Add Job
+                {submitting ? "Posting..." : "Post Job"}
               </button>
             </div>
           </form>

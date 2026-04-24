@@ -1,11 +1,12 @@
+import { CSSProperties } from "react";
 import ClipLoader from "react-spinners/ClipLoader";
 
-const override = {
+const override: CSSProperties = {
   display: "block",
   margin: "100px auto",
 };
 interface Props {
-  loading: string;
+  loading: boolean;
 }
 const Spinner = ({ loading }: Props) => {
   return (

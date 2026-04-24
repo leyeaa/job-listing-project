@@ -9,61 +9,70 @@ import HomePage from "./pages/HomePage";
 import MainLayout from "./layouts/MainLayout";
 import JobsPage from "./pages/JobsPage";
 import NotFoundPage from "./pages/NotFoundPage";
-import JobPage, { jobLoader } from "./pages/JobPage";
+import JobPage from "./pages/JobPage.tsx";
 import AddJobPage from "./pages/AddJobPage";
-import EditJobPage from "./pages/EditJobPage";
+import EditJobPage from "./pages/EditJobPage.tsx";
+import LoginPage from "./pages/LoginPage";
+import ProtectedRoute from "./components/ProtectedRoute";
+import { useAuth } from "./context/AuthContext";
+import {
+  createJob,
+  deleteJob as deleteJobById,
+  updateJob,
+} from "./services/jobsApi";
+import type { JobFormInput } from "./types/job";
+
 const App = () => {
-  //Add New Job
-  const addJob = async (newJob) => {
-    const res = await fetch("/api/jobs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(newJob),
-    });
-    return;
+  const { user } = useAuth();
+
+  const addJob = async (newJob: JobFormInput) => {
+    if (!user) {
+      throw new Error("You must be signed in to post a job.");
+    }
+
+    await createJob(newJob, user.id);
   };
 
-  const updateJob = async (job) => {
-    const res = await fetch(`/api/jobs/${job.id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(job),
-    });
-    return;
+  const updateJobById = async (jobId: string, job: JobFormInput) => {
+    if (!user) {
+      throw new Error("You must be signed in to update a job.");
+    }
+
+    await updateJob(jobId, job, user.id);
   };
 
-  //Delete Job
+  const deleteJob = async (jobId: string) => {
+    if (!user) {
+      throw new Error("You must be signed in to delete a job.");
+    }
 
-  const deleteJob = async (jobId) => {
-    const res = await fetch(`/api/jobs/${jobId}`, {
-      method: "DELETE",
-    });
-    return;
+    await deleteJobById(jobId, user.id);
   };
+
   const router = createBrowserRouter(
     createRoutesFromElements(
       <Route path="/" element={<MainLayout />}>
         <Route index element={<HomePage />} />
         <Route path="/jobs" element={<JobsPage />} />
-        <Route path="/add-job" element={<AddJobPage addJobSubmit={addJob} />} />
-        <Route
-          path="/jobs/:id"
-          element={<JobPage deleteJob={deleteJob} />}
-          loader={jobLoader}
-        />
-        <Route
-          path="/edit-job/:id"
-          element={<EditJobPage updateJobSubmit={updateJob} />}
-          loader={jobLoader}
-        />
+        <Route path="/login" element={<LoginPage />} />
+
+        <Route element={<ProtectedRoute />}>
+          <Route
+            path="/add-job"
+            element={<AddJobPage addJobSubmit={addJob} />}
+          />
+          <Route
+            path="/edit-job/:id"
+            element={<EditJobPage updateJobSubmit={updateJobById} />}
+          />
+        </Route>
+
+        <Route path="/jobs/:id" element={<JobPage deleteJob={deleteJob} />} />
         <Route path="*" element={<NotFoundPage />} />
-      </Route>
-    )
+      </Route>,
+    ),
   );
+
   return <RouterProvider router={router} />;
 };
 

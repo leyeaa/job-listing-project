@@ -1,28 +1,97 @@
-import { useLoaderData, useNavigate, useParams } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
+import Spinner from "../components/Spinner";
+import { useAuth } from "../context/AuthContext";
+import { getJobById } from "../services/jobsApi";
+import type { Job, JobFormInput } from "../types/job";
+
 interface Props {
-  updateJobSubmit: (updatedJob) => void;
+  updateJobSubmit: (jobId: string, updatedJob: JobFormInput) => Promise<void>;
 }
+
 const EditJobPage = ({ updateJobSubmit }: Props) => {
-  const job = useLoaderData();
-  const { id } = useParams();
+  const { id = "" } = useParams();
   const navigate = useNavigate();
-  const [type, setType] = useState(job.type);
-  const [title, setTitle] = useState(job.title);
-  const [description, setDescription] = useState(job.description);
-  const [salary, setSalary] = useState(job.salary);
-  const [location, setLocation] = useState(job.location);
-  const [companyName, setCompanyName] = useState(job.company.name);
-  const [companyDescription, setCompanyDescription] = useState(
-    job.company.description
-  );
-  const [contactEmail, setContactEmail] = useState(job.company.contactEmail);
-  const [contactPhone, setContactPhone] = useState(job.company.contactPhone);
-  const submitForm = (e) => {
+  const { user } = useAuth();
+
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const [type, setType] = useState("Full-Time");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [salary, setSalary] = useState("Under $50K");
+  const [location, setLocation] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [companyDescription, setCompanyDescription] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadJob = async () => {
+      if (!id) {
+        setErrorMessage("Invalid job id.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const job: Job = await getJobById(id);
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (user && job.createdBy !== user.id) {
+          setErrorMessage("You can only edit jobs that you created.");
+          setLoading(false);
+          return;
+        }
+
+        setType(job.type);
+        setTitle(job.title);
+        setDescription(job.description);
+        setSalary(job.salary);
+        setLocation(job.location);
+        setCompanyName(job.company.name);
+        setCompanyDescription(job.company.description);
+        setContactEmail(job.company.contactEmail);
+        setContactPhone(job.company.contactPhone);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        const message =
+          error instanceof Error ? error.message : "Unable to load this job.";
+        setErrorMessage(message);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadJob();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, user]);
+
+  const submitForm = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const updatedJob = {
-      id,
+
+    if (!id) {
+      toast.error("Invalid job id.");
+      return;
+    }
+
+    const updatedJob: JobFormInput = {
       title,
       type,
       description,
@@ -35,10 +104,46 @@ const EditJobPage = ({ updateJobSubmit }: Props) => {
         contactPhone,
       },
     };
-    updateJobSubmit(updatedJob);
-    toast.success("Job Updated Successfully");
-    return navigate("/jobs");
+
+    setSubmitting(true);
+
+    try {
+      await updateJobSubmit(id, updatedJob);
+      toast.success("Job updated successfully.");
+      navigate(`/jobs/${id}`);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not update the job.";
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <section className="bg-indigo-50 min-h-[60vh]">
+        <Spinner loading={true} />
+      </section>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <section className="bg-indigo-50 min-h-[60vh] py-20 px-6">
+        <div className="container m-auto max-w-2xl rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+          <p>{errorMessage}</p>
+          <Link
+            className="inline-block mt-4 text-indigo-700 hover:text-indigo-900"
+            to="/jobs"
+          >
+            Back to jobs
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="bg-indigo-50">
       <div className="container m-auto max-w-2xl py-24">
@@ -65,6 +170,7 @@ const EditJobPage = ({ updateJobSubmit }: Props) => {
               >
                 <option value="Full-Time">Full-Time</option>
                 <option value="Part-Time">Part-Time</option>
+                <option value="Contract">Contract</option>
                 <option value="Remote">Remote</option>
                 <option value="Internship">Internship</option>
               </select>
@@ -79,12 +185,13 @@ const EditJobPage = ({ updateJobSubmit }: Props) => {
                 id="title"
                 name="title"
                 className="border rounded w-full py-2 px-3 mb-2"
-                placeholder="eg. Beautiful Apartment In Miami"
+                placeholder="e.g. Senior Platform Engineer"
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
               />
             </div>
+
             <div className="mb-4">
               <label
                 htmlFor="description"
@@ -96,7 +203,7 @@ const EditJobPage = ({ updateJobSubmit }: Props) => {
                 id="description"
                 name="description"
                 className="border rounded w-full py-2 px-3"
-                rows="4"
+                rows={4}
                 placeholder="Add any job duties, expectations, requirements, etc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -105,7 +212,7 @@ const EditJobPage = ({ updateJobSubmit }: Props) => {
 
             <div className="mb-4">
               <label
-                htmlFor="type"
+                htmlFor="salary"
                 className="block text-gray-700 font-bold mb-2"
               >
                 Salary
@@ -179,7 +286,7 @@ const EditJobPage = ({ updateJobSubmit }: Props) => {
                 id="company_description"
                 name="company_description"
                 className="border rounded w-full py-2 px-3"
-                rows="4"
+                rows={4}
                 placeholder="What does your company do?"
                 value={companyDescription}
                 onChange={(e) => setCompanyDescription(e.target.value)}
@@ -204,6 +311,7 @@ const EditJobPage = ({ updateJobSubmit }: Props) => {
                 onChange={(e) => setContactEmail(e.target.value)}
               />
             </div>
+
             <div className="mb-4">
               <label
                 htmlFor="contact_phone"
@@ -226,8 +334,9 @@ const EditJobPage = ({ updateJobSubmit }: Props) => {
               <button
                 className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-full w-full focus:outline-none focus:shadow-outline"
                 type="submit"
+                disabled={submitting}
               >
-                Update Job
+                {submitting ? "Updating..." : "Update Job"}
               </button>
             </div>
           </form>

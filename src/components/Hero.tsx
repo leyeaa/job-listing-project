@@ -3,8 +3,8 @@ interface Props {
   subtitle?: string;
 }
 const Hero = ({
-  title = "Become a React Developer",
-  subtitle = "Job Listing",
+  title = "Find Your Next Tech Role",
+  subtitle = "Browse engineering, data, design, product, and security jobs.",
 }: Props) => {
   return (
     <section className="bg-indigo-700 py-20 mb-4">
