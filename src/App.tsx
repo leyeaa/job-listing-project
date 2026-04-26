@@ -14,7 +14,7 @@ import AddJobPage from "./pages/AddJobPage";
 import EditJobPage from "./pages/EditJobPage.tsx";
 import LoginPage from "./pages/LoginPage";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { useAuth } from "./context/AuthContext";
+import { useAuth } from "./context/useAuth";
 import {
   createJob,
   deleteJob as deleteJobById,
@@ -71,6 +71,9 @@ const App = () => {
         <Route path="*" element={<NotFoundPage />} />
       </Route>,
     ),
+    {
+      basename: import.meta.env.BASE_URL,
+    },
   );
 
   return <RouterProvider router={router} />;

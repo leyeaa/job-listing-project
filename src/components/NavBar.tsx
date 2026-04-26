@@ -5,7 +5,7 @@ import {
   type NavLinkRenderProps,
 } from "react-router-dom";
 import { toast } from "react-toastify";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 
 const NavBar = () => {
   const { user, signOut } = useAuth();

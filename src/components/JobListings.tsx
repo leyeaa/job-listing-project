@@ -121,7 +121,7 @@ const JobListings = ({ isHome = false }: Props) => {
     if (shouldApplyUrlState) {
       isApplyingUrlStateRef.current = true;
     }
-  }, [isHome, searchParams]);
+  }, [isHome, searchParams, searchTerm, jobType, currentPage]);
 
   useEffect(() => {
     if (isHome) {

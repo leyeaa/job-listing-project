@@ -1,6 +1,6 @@
 import Card from "../components/Card";
 import { Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 
 const HomeCards = () => {
   const { user } = useAuth();

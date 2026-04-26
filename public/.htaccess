@@ -1,0 +1,12 @@
+RewriteEngine On
+
+# Static health endpoint for simple uptime probes.
+RewriteRule ^healthz$ - [L]
+
+# Serve existing files/directories directly.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# SPA fallback for client-side routes.
+RewriteRule ^ index.html [L]

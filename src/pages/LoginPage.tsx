@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { isSupabaseConfigured } from "../lib/supabase";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 
 interface LocationState {
   from?: {
