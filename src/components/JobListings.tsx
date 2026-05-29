@@ -210,6 +210,7 @@ const JobListings = ({ isHome = false }: Props) => {
   const startPage = Math.max(1, currentPage - 2);
   const endPage = Math.min(totalPages, startPage + 4);
   const visiblePages: number[] = [];
+  const showFullSpinner = loading && jobs.length === 0;
 
   for (let page = startPage; page <= endPage; page += 1) {
     visiblePages.push(page);
@@ -263,7 +264,13 @@ const JobListings = ({ isHome = false }: Props) => {
           </div>
         )}
 
-        {loading ? (
+        {!isHome && loading && jobs.length > 0 && (
+          <p className="mb-4 text-center text-sm text-indigo-700">
+            Loading next page...
+          </p>
+        )}
+
+        {showFullSpinner ? (
           <Spinner loading={loading} />
         ) : errorMessage ? (
           <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-700">
