@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import JobListing from "./JobListing";
 import Spinner from "./Spinner";
@@ -36,29 +36,29 @@ const parsePage = (value: string | null) => {
 
 const JobListings = ({ isHome = false }: Props) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const hasInitializedFiltersRef = useRef(false);
-  const isApplyingUrlStateRef = useRef(false);
-  const isApplyingInternalParamsRef = useRef(false);
-
-  const initialSearchTerm = isHome ? "" : (searchParams.get("q") ?? "");
-  const initialJobTypeParam = isHome
-    ? "All"
-    : (searchParams.get("type") ?? "All");
-  const initialJobType = isValidJobType(initialJobTypeParam)
-    ? initialJobTypeParam
-    : "All";
-  const initialPage = isHome ? 1 : parsePage(searchParams.get("page"));
+  const urlSearchTerm = isHome ? "" : (searchParams.get("q") ?? "");
+  const urlJobTypeRaw = isHome ? "All" : (searchParams.get("type") ?? "All");
+  const urlJobType = isValidJobType(urlJobTypeRaw) ? urlJobTypeRaw : "All";
+  const currentPage = isHome ? 1 : parsePage(searchParams.get("page"));
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
-  const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
-  const [debouncedSearchTerm, setDebouncedSearchTerm] =
-    useState(initialSearchTerm);
-  const [jobType, setJobType] = useState<JobTypeOption>(initialJobType);
-  const [currentPage, setCurrentPage] = useState(initialPage);
+  const [searchTerm, setSearchTerm] = useState(urlSearchTerm);
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(urlSearchTerm);
   const [totalPages, setTotalPages] = useState(1);
   const [totalResults, setTotalResults] = useState(0);
+
+  useEffect(() => {
+    if (isHome) {
+      return;
+    }
+
+    if (searchTerm !== urlSearchTerm) {
+      setSearchTerm(urlSearchTerm);
+      setDebouncedSearchTerm(urlSearchTerm);
+    }
+  }, [isHome, searchTerm, urlSearchTerm]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -73,109 +73,65 @@ const JobListings = ({ isHome = false }: Props) => {
       return;
     }
 
-    if (!hasInitializedFiltersRef.current) {
-      hasInitializedFiltersRef.current = true;
-      return;
-    }
-
-    if (isApplyingUrlStateRef.current) {
-      isApplyingUrlStateRef.current = false;
-      return;
-    }
-
-    setCurrentPage(1);
-  }, [debouncedSearchTerm, jobType, isHome]);
-
-  useEffect(() => {
-    if (isHome) {
-      return;
-    }
-
-    if (isApplyingInternalParamsRef.current) {
-      isApplyingInternalParamsRef.current = false;
-      return;
-    }
-
-    const urlSearchTerm = searchParams.get("q") ?? "";
-    const urlJobTypeRaw = searchParams.get("type") ?? "All";
-    const urlJobType = isValidJobType(urlJobTypeRaw) ? urlJobTypeRaw : "All";
-    const urlPage = parsePage(searchParams.get("page"));
-
-    let shouldApplyUrlState = false;
-
-    if (urlSearchTerm !== searchTerm) {
-      shouldApplyUrlState = true;
-      setSearchTerm(urlSearchTerm);
-      setDebouncedSearchTerm(urlSearchTerm);
-    }
-
-    if (urlJobType !== jobType) {
-      shouldApplyUrlState = true;
-      setJobType(urlJobType);
-    }
-
-    if (urlPage !== currentPage) {
-      setCurrentPage(urlPage);
-    }
-
-    if (shouldApplyUrlState) {
-      isApplyingUrlStateRef.current = true;
-    }
-  }, [isHome, searchParams, searchTerm, jobType, currentPage]);
-
-  useEffect(() => {
-    if (isHome) {
-      return;
-    }
-
-    const nextParams = new URLSearchParams();
+    const nextParams = new URLSearchParams(searchParams);
     const trimmedSearch = debouncedSearchTerm.trim();
 
     if (trimmedSearch.length > 0) {
       nextParams.set("q", trimmedSearch);
-    }
-
-    if (jobType !== "All") {
-      nextParams.set("type", jobType);
+    } else {
+      nextParams.delete("q");
     }
 
     if (currentPage > 1) {
       nextParams.set("page", String(currentPage));
+    } else {
+      nextParams.delete("page");
     }
 
     if (nextParams.toString() !== searchParams.toString()) {
-      isApplyingInternalParamsRef.current = true;
       setSearchParams(nextParams, { replace: true });
     }
-  }, [
-    isHome,
-    debouncedSearchTerm,
-    jobType,
-    currentPage,
-    searchParams,
-    setSearchParams,
-  ]);
+  }, [debouncedSearchTerm, isHome, currentPage, searchParams, setSearchParams]);
 
   useEffect(() => {
+    let isActive = true;
+
     const fetchJobs = async () => {
       setLoading(true);
 
       try {
         if (isHome) {
           const data = await getJobs(3);
+
+          if (!isActive) {
+            return;
+          }
+
           setJobs(data);
           setTotalPages(1);
           setTotalResults(data.length);
         } else {
           const result = await searchJobs({
             searchTerm: debouncedSearchTerm,
-            jobType,
+            jobType: urlJobType,
             page: currentPage,
             pageSize: PAGE_SIZE,
           });
 
+          if (!isActive) {
+            return;
+          }
+
           if (result.total > 0 && currentPage > result.totalPages) {
-            setCurrentPage(result.totalPages);
+            const nextParams = new URLSearchParams(searchParams);
+
+            if (result.totalPages > 1) {
+              nextParams.set("page", String(result.totalPages));
+            } else {
+              nextParams.delete("page");
+            }
+
+            setSearchParams(nextParams, { replace: true });
             return;
           }
 
@@ -187,6 +143,11 @@ const JobListings = ({ isHome = false }: Props) => {
         setErrorMessage("");
       } catch (error) {
         console.log("Error fetching data", error);
+
+        if (!isActive) {
+          return;
+        }
+
         const message =
           error instanceof Error
             ? error.message
@@ -194,27 +155,45 @@ const JobListings = ({ isHome = false }: Props) => {
 
         setErrorMessage(`Could not load jobs from the database. ${message}`);
       } finally {
-        setLoading(false);
+        if (isActive) {
+          setLoading(false);
+        }
       }
     };
 
     fetchJobs();
-  }, [isHome, debouncedSearchTerm, jobType, currentPage]);
+
+    return () => {
+      isActive = false;
+    };
+  }, [
+    isHome,
+    debouncedSearchTerm,
+    urlJobType,
+    currentPage,
+    searchParams,
+    setSearchParams,
+  ]);
 
   const handleClearFilters = () => {
     setSearchTerm("");
-    setJobType("All");
-    setCurrentPage(1);
+    setDebouncedSearchTerm("");
+    setSearchParams(new URLSearchParams(), { replace: true });
   };
 
   const startPage = Math.max(1, currentPage - 2);
   const endPage = Math.min(totalPages, startPage + 4);
-  const visiblePages: number[] = [];
-  const showFullSpinner = loading && jobs.length === 0;
+  const visiblePages = useMemo(() => {
+    const pages: number[] = [];
 
-  for (let page = startPage; page <= endPage; page += 1) {
-    visiblePages.push(page);
-  }
+    for (let page = startPage; page <= endPage; page += 1) {
+      pages.push(page);
+    }
+
+    return pages;
+  }, [startPage, endPage]);
+
+  const showFullSpinner = loading && jobs.length === 0;
 
   return (
     <section className="bg-blue-50 px-4 py-10">
@@ -236,10 +215,19 @@ const JobListings = ({ isHome = false }: Props) => {
 
               <select
                 className="border rounded px-3 py-2"
-                value={jobType}
+                value={urlJobType}
                 onChange={(e) => {
                   const nextValue = e.target.value;
-                  setJobType(isValidJobType(nextValue) ? nextValue : "All");
+                  const nextParams = new URLSearchParams(searchParams);
+
+                  if (isValidJobType(nextValue) && nextValue !== "All") {
+                    nextParams.set("type", nextValue);
+                  } else {
+                    nextParams.delete("type");
+                  }
+
+                  nextParams.delete("page");
+                  setSearchParams(nextParams, { replace: true });
                 }}
               >
                 {JOB_TYPE_OPTIONS.map((option) => (
@@ -292,9 +280,18 @@ const JobListings = ({ isHome = false }: Props) => {
                   type="button"
                   className="px-3 py-2 rounded border bg-white hover:bg-gray-100 disabled:opacity-50"
                   disabled={currentPage === 1}
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.max(1, prev - 1))
-                  }
+                  onClick={() => {
+                    const nextPage = Math.max(1, currentPage - 1);
+                    const nextParams = new URLSearchParams(searchParams);
+
+                    if (nextPage > 1) {
+                      nextParams.set("page", String(nextPage));
+                    } else {
+                      nextParams.delete("page");
+                    }
+
+                    setSearchParams(nextParams, { replace: true });
+                  }}
                 >
                   Prev
                 </button>
@@ -308,7 +305,17 @@ const JobListings = ({ isHome = false }: Props) => {
                         ? "bg-indigo-600 text-white border-indigo-600"
                         : "bg-white hover:bg-gray-100"
                     }`}
-                    onClick={() => setCurrentPage(page)}
+                    onClick={() => {
+                      const nextParams = new URLSearchParams(searchParams);
+
+                      if (page > 1) {
+                        nextParams.set("page", String(page));
+                      } else {
+                        nextParams.delete("page");
+                      }
+
+                      setSearchParams(nextParams, { replace: true });
+                    }}
                   >
                     {page}
                   </button>
@@ -318,9 +325,18 @@ const JobListings = ({ isHome = false }: Props) => {
                   type="button"
                   className="px-3 py-2 rounded border bg-white hover:bg-gray-100 disabled:opacity-50"
                   disabled={currentPage === totalPages}
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.min(totalPages, prev + 1))
-                  }
+                  onClick={() => {
+                    const nextPage = Math.min(totalPages, currentPage + 1);
+                    const nextParams = new URLSearchParams(searchParams);
+
+                    if (nextPage > 1) {
+                      nextParams.set("page", String(nextPage));
+                    } else {
+                      nextParams.delete("page");
+                    }
+
+                    setSearchParams(nextParams, { replace: true });
+                  }}
                 >
                   Next
                 </button>
