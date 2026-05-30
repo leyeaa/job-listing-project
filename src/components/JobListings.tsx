@@ -54,11 +54,9 @@ const JobListings = ({ isHome = false }: Props) => {
       return;
     }
 
-    if (searchTerm !== urlSearchTerm) {
-      setSearchTerm(urlSearchTerm);
-      setDebouncedSearchTerm(urlSearchTerm);
-    }
-  }, [isHome, searchTerm, urlSearchTerm]);
+    setSearchTerm(urlSearchTerm);
+    setDebouncedSearchTerm(urlSearchTerm);
+  }, [isHome, urlSearchTerm]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {

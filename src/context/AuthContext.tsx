@@ -59,6 +59,10 @@ export const AuthProvider = ({ children }: Props) => {
       throw new Error(error.message);
     }
 
+    if (!data.user || data.user.identities?.length === 0) {
+      throw new Error("An account with this email already exists.");
+    }
+
     return { requiresEmailConfirmation: !data.session };
   };
 
